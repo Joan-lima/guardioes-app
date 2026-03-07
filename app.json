@@ -1,0 +1,54 @@
+{
+  "expo": {
+    "name": "Guardiões da Consciência",
+    "slug": "guardioes-consciencia",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "scheme": "guardioes",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0A0B10"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "br.com.guardioesdaconsciencia.app"
+    },
+    "android": {
+      "package": "br.com.guardioesdaconsciencia.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png",
+        "backgroundColor": "#0A0B10"
+      }
+    },
+    "web": {
+      "bundler": "metro",
+      "favicon": "./assets/favicon.png",
+      "output": "single",
+      "name": "Guardiões da Consciência",
+      "shortName": "Guardiões",
+      "lang": "pt-BR",
+      "themeColor": "#0A0B10",
+      "backgroundColor": "#0A0B10",
+      "description": "Sistema de gestão Guardiões da Consciência",
+      "display": "standalone",
+      "orientation": "portrait"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Permitir acesso à câmera para leitura de QR Code"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
