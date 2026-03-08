@@ -33,13 +33,13 @@ export default function DashboardScreen() {
     const { count: eventsCount } = await supabase
       .from('events')
       .select('*', { count: 'exact', head: true })
-      .eq('created_by', profile.id);
+      .eq('leader_id', profile.id);
 
     // Total check-ins across my events
     const { data: myEvents } = await supabase
       .from('events')
       .select('id, attendees_count')
-      .eq('created_by', profile.id);
+      .eq('leader_id', profile.id);
 
     const totalCheckins = myEvents?.reduce((sum, e) => sum + (e.attendees_count || 0), 0) ?? 0;
 
@@ -66,7 +66,7 @@ export default function DashboardScreen() {
     const { data: recent } = await supabase
       .from('events')
       .select('id, title, event_date, attendees_count, is_official')
-      .eq('created_by', profile.id)
+      .eq('leader_id', profile.id)
       .order('event_date', { ascending: false })
       .limit(3);
 

@@ -48,7 +48,7 @@ export type Database = {
         Update: Partial<Database['public']['Tables']['messages']['Insert']>;
       };
       events: {
-        Row: { id: string; city_id: string | null; created_by: string; title: string; event_date: string; event_time: string | null; location: string | null; description: string | null; is_official: boolean; qr_token: string; attendees_count: number; cancelled_at: string | null; created_at: string };
+        Row: { id: string; city_id: string | null; leader_id: string; title: string; event_date: string; event_time: string | null; location: string | null; description: string | null; is_official: boolean; qr_token: string; attendees_count: number; cancelled_at: string | null; created_at: string };
         Insert: Omit<Database['public']['Tables']['events']['Row'], 'id' | 'qr_token' | 'attendees_count' | 'created_at'>;
         Update: Partial<Database['public']['Tables']['events']['Insert']>;
       };

@@ -46,7 +46,7 @@ export default function EventsScreen() {
 
   async function loadEvents() {
     const q = supabase.from('events').select('*').order('event_date', { ascending: false });
-    if (profile?.role === 'LIDER') q.eq('created_by', profile.id);
+    if (profile?.role === 'LIDER') q.eq('leader_id', profile.id);
     const { data } = await q;
     setEvents(data ?? []);
     setLoading(false);
@@ -73,7 +73,7 @@ export default function EventsScreen() {
       event_time:  form.event_time || null,
       location:    form.location || null,
       is_official: profile?.role === 'ADM' ? form.is_official : false,
-      created_by:  profile!.id,
+      leader_id:   profile!.id,
       city_id:     profile?.city_id ?? null,
     });
     setSaving(false);
