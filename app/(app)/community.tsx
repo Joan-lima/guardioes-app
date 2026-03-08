@@ -19,13 +19,25 @@ export default function CommunityScreen() {
   const flatRef = useRef<FlatList>(null);
 
   useEffect(() => {
+    if (!profile) return;
     async function loadChannels() {
-      const { data } = await supabase.from('channels').select('*').order('type');
+      // Filtra canais visíveis por role
+      const visibleTypes: Record<string, string[]> = {
+        ADM:    ['official_global', 'leaders_notices', 'leaders_general', 'city_notices', 'city_general'],
+        LIDER:  ['official_global', 'leaders_general', 'leaders_notices', 'city_notices', 'city_general'],
+        MEMBRO: ['official_global', 'city_general'],
+      };
+      const allowed = visibleTypes[profile.role] ?? ['city_general', 'official_global'];
+      const { data } = await supabase
+        .from('channels')
+        .select('*')
+        .in('type', allowed)
+        .order('type');
       setChannels(data ?? []);
       if (data && data.length > 0) setActive(data[0]);
     }
     loadChannels();
-  }, []);
+  }, [profile]);
 
   useEffect(() => {
     if (!active) return;

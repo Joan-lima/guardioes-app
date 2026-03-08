@@ -54,6 +54,7 @@ export default function SalesScreen() {
       value:          selProduct.price,
       commission,
       platform:       selProduct.platform,
+      status:         'confirmed',
     });
     setSaving(false);
     if (error) { Alert.alert('Erro', error.message); return; }
