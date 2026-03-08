@@ -3,21 +3,18 @@ import { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 
 export type UserRole   = 'ADM' | 'LIDER' | 'MEMBRO';
-export type UserStatus = 'pending' | 'active' | 'inactive' | 'rejected';
+export type UserStatus = 'pending' | 'active' | 'rejected' | 'suspended';
 
 export interface Profile {
-  id:                string;
-  name:              string;
-  email:             string;
-  cpf?:              string;
-  phone?:            string;
-  city_id?:          string;
-  role:              UserRole;
-  status:            UserStatus;
-  adm_approved_at?:  string;
-  lider_approved_at?: string;
-  photo_url?:        string;
-  total_pe:          number;
+  id:       string;
+  name:     string;
+  email:    string;
+  document?: string;
+  phone?:   string;
+  city_id?: string;
+  role:     UserRole;
+  status:   UserStatus;
+  total_pe: number;
 }
 
 interface AuthState {

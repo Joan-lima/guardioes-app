@@ -12,6 +12,14 @@ export const supabase = createClient(supabaseUrl, supabaseAnon, {
   },
 });
 
+// Enums reais do banco
+export type UserRole    = 'ADM' | 'LIDER' | 'MEMBRO';
+export type UserStatus  = 'pending' | 'active' | 'rejected' | 'suspended';
+export type McStatus    = 'completed' | 'validated' | 'rejected';
+export type PeSource    = 'checkin' | 'mission' | 'sale' | 'recruit_member' | 'recruit_leader' | 'manual' | 'approval';
+export type SaleStatus  = 'pending' | 'confirmed' | 'cancelled' | 'chargeback';
+export type ChType      = 'official_global' | 'leaders_notices' | 'leaders_general' | 'city_notices' | 'city_general';
+
 export type Database = {
   public: {
     Tables: {
@@ -20,11 +28,11 @@ export type Database = {
           id:         string;
           name:       string;
           email:      string;
-          cpf:        string | null;
+          document:   string | null;
           phone:      string | null;
           city_id:    string | null;
-          role:       'ADM' | 'LIDER' | 'MEMBRO';
-          status:     'pending' | 'active' | 'rejected' | 'inactive';
+          role:       UserRole;
+          status:     UserStatus;
           total_pe:   number;
           created_at: string;
           updated_at: string;
@@ -38,7 +46,7 @@ export type Database = {
         Update: Partial<Database['public']['Tables']['cities']['Insert']>;
       };
       channels: {
-        Row: { id: string; name: string; type: string; city_id: string | null; is_readonly_for_members: boolean; created_at: string };
+        Row: { id: string; name: string; type: ChType; city_id: string | null; is_readonly_for_members: boolean; created_at: string };
         Insert: Omit<Database['public']['Tables']['channels']['Row'], 'id' | 'created_at'>;
         Update: Partial<Database['public']['Tables']['channels']['Insert']>;
       };
@@ -58,17 +66,17 @@ export type Database = {
         Update: never;
       };
       missions: {
-        Row: { id: string; title: string; description: string; points: number; category: string; target_role: 'ADM' | 'LIDER' | 'MEMBRO'; is_active: boolean; created_by: string; created_at: string };
+        Row: { id: string; title: string; description: string; points: number; category: string; target_role: UserRole; is_active: boolean; created_by: string | null; created_at: string };
         Insert: Omit<Database['public']['Tables']['missions']['Row'], 'id' | 'created_at'>;
         Update: Partial<Database['public']['Tables']['missions']['Insert']>;
       };
       mission_completions: {
-        Row: { id: string; mission_id: string; user_id: string; status: 'completed' | 'validated' | 'rejected'; validated_by: string | null; validated_at: string | null; created_at: string };
+        Row: { id: string; mission_id: string; user_id: string; status: McStatus; validated_by: string | null; validated_at: string | null; created_at: string };
         Insert: Omit<Database['public']['Tables']['mission_completions']['Row'], 'id' | 'created_at'>;
         Update: Partial<Database['public']['Tables']['mission_completions']['Insert']>;
       };
       expansion_points: {
-        Row: { id: string; user_id: string; amount: number; source: string; ref_id: string | null; note: string | null; created_at: string };
+        Row: { id: string; user_id: string; amount: number; source: PeSource; ref_id: string | null; note: string | null; created_at: string };
         Insert: Omit<Database['public']['Tables']['expansion_points']['Row'], 'id' | 'created_at'>;
         Update: never;
       };
@@ -78,7 +86,7 @@ export type Database = {
         Update: Partial<Database['public']['Tables']['products']['Insert']>;
       };
       sales: {
-        Row: { id: string; leader_id: string; product_id: string; buyer_name: string; buyer_email: string; buyer_document: string | null; value: number; commission: number; platform: string | null; status: string; sold_at: string };
+        Row: { id: string; leader_id: string; product_id: string; buyer_name: string; buyer_email: string; buyer_document: string | null; value: number; commission: number; platform: string | null; status: SaleStatus; sold_at: string };
         Insert: Omit<Database['public']['Tables']['sales']['Row'], 'id' | 'sold_at'>;
         Update: Partial<Database['public']['Tables']['sales']['Insert']>;
       };
