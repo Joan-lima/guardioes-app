@@ -20,9 +20,9 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (loading) return;
     const inAuth = segments[0] === '(auth)';
-    const inCheckin = segments[0] === 'checkin';
+    const inPublicRoute = ['checkin', 'register', 'checkin-confirm'].includes(segments[0] as string);
 
-    if (!session && !inAuth && !inCheckin) {
+    if (!session && !inAuth && !inPublicRoute) {
       router.replace('/(auth)/login');
       return;
     }
