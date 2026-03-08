@@ -42,9 +42,5 @@
     "@types/react": "~19.2.2",
     "typescript": "~5.9.2"
   },
-  "private": true,
-  "overrides": {
-    "react": "19.0.0",
-    "react-dom": "19.0.0"
-  }
+  "private": true
 }
