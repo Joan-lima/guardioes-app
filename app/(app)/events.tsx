@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Modal,
-  TextInput, Alert, RefreshControl, Switch,
+  TextInput, Alert, RefreshControl, Switch, Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import QRCode from 'react-native-qrcode-svg';
@@ -208,9 +208,35 @@ export default function EventsScreen() {
               </View>
               <View>
                 <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 11, color: COLORS.gray400, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 8 }}>
-                  Data * (AAAA-MM-DD)
+                  Data *
                 </Text>
-                <TextInput value={form.event_date} onChangeText={t => setForm(f => ({ ...f, event_date: t }))} placeholder="2026-03-15" placeholderTextColor={COLORS.gray600} style={inputStyle} />
+                {Platform.OS === 'web' ? (
+                  <input
+                    type="date"
+                    value={form.event_date}
+                    onChange={(e: any) => setForm(f => ({ ...f, event_date: e.target.value }))}
+                    style={{
+                      backgroundColor: 'rgba(255,255,255,0.05)',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      borderRadius: 10,
+                      padding: '12px 14px',
+                      color: '#FFFFFF',
+                      fontSize: 14,
+                      width: '100%',
+                      boxSizing: 'border-box',
+                      colorScheme: 'dark',
+                      fontFamily: 'inherit',
+                    } as any}
+                  />
+                ) : (
+                  <TextInput
+                    value={form.event_date}
+                    onChangeText={t => setForm(f => ({ ...f, event_date: t }))}
+                    placeholder="AAAA-MM-DD"
+                    placeholderTextColor={COLORS.gray600}
+                    style={inputStyle}
+                  />
+                )}
               </View>
               <View>
                 <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 11, color: COLORS.gray400, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 8 }}>
