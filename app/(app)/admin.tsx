@@ -56,6 +56,9 @@ export default function AdminScreen() {
   const [newGroup, setNewGroup]           = useState({ name: '', city_id: '', leader_id: '' });
   const [addingGroup, setAddingGroup]     = useState(false);
 
+  // Atribuir líder a grupo
+  const [assigningGroup, setAssigningGroup] = useState<string | null>(null);
+
   // Pending: which group is selected per user
   const [selectedGroups, setSelectedGroups] = useState<Record<string, string>>({});
 
@@ -177,6 +180,40 @@ export default function AdminScreen() {
   async function toggleGroupActive(group: Group) {
     await supabase.from('groups').update({ is_active: !group.is_active }).eq('id', group.id);
     load();
+  }
+
+  async function assignLeaderToGroup(groupId: string, leaderId: string, cityId: string) {
+    const [{ error: e1 }, { error: e2 }] = await Promise.all([
+      supabase.from('groups').update({ leader_id: leaderId }).eq('id', groupId),
+      supabase.from('profiles').update({ group_id: groupId, city_id: cityId }).eq('id', leaderId),
+    ]);
+    if (e1 || e2) { Alert.alert('Erro', (e1 || e2)!.message); return; }
+    setAssigningGroup(null);
+    load();
+  }
+
+  async function changeUserRole(userId: string, userName: string, newRole: string) {
+    Alert.alert(`Alterar para ${newRole}?`, `${userName} terá o papel de ${newRole}.`, [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Confirmar',
+        onPress: async () => {
+          const { error } = await supabase.from('profiles').update({ role: newRole }).eq('id', userId);
+          if (error) { Alert.alert('Erro', error.message); return; }
+          loadUsers();
+        },
+      },
+    ]);
+  }
+
+  async function assignUserToGroup(userId: string, groupId: string) {
+    const group = groups.find(g => g.id === groupId);
+    if (!group) return;
+    const { error } = await supabase.from('profiles').update({
+      group_id: groupId, city_id: group.city_id,
+    }).eq('id', userId);
+    if (error) { Alert.alert('Erro', error.message); return; }
+    loadUsers();
   }
 
   // ─── Guard ─────────────────────────────────────────────────────────────────
@@ -515,15 +552,53 @@ export default function AdminScreen() {
                           </Text>
                         </View>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                          <Badge
-                            label={g.is_active ? 'Ativo' : 'Inativo'}
-                            variant={g.is_active ? 'green' : 'yellow'}
-                          />
+                          <Badge label={g.is_active ? 'Ativo' : 'Inativo'} variant={g.is_active ? 'green' : 'yellow'} />
                           <TouchableOpacity onPress={() => toggleGroupActive(g)}>
                             <Text style={{ fontSize: 16 }}>{g.is_active ? '⏸' : '▶️'}</Text>
                           </TouchableOpacity>
+                          <TouchableOpacity
+                            onPress={() => setAssigningGroup(assigningGroup === g.id ? null : g.id)}
+                            style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1, borderColor: COLORS.gold }}
+                          >
+                            <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 10, color: COLORS.gold }}>👤 Líder</Text>
+                          </TouchableOpacity>
                         </View>
                       </View>
+
+                      {/* Seletor de líder inline */}
+                      {assigningGroup === g.id && (
+                        <View style={{ marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)' }}>
+                          <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 10, color: COLORS.gray400, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>
+                            Selecionar líder:
+                          </Text>
+                          {leaders.length === 0 ? (
+                            <Text style={{ fontFamily: FONTS.body, fontSize: 12, color: COLORS.gray500 }}>
+                              Nenhum líder ativo. Aprove um líder primeiro ou promova na aba Usuários.
+                            </Text>
+                          ) : (
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                              <View style={{ flexDirection: 'row', gap: 6 }}>
+                                {leaders.map(l => (
+                                  <TouchableOpacity
+                                    key={l.id}
+                                    onPress={() => assignLeaderToGroup(g.id, l.id, g.city_id)}
+                                    style={{
+                                      paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8,
+                                      borderWidth: 1,
+                                      borderColor: g.leader_id === l.id ? COLORS.gold : 'rgba(255,255,255,0.2)',
+                                      backgroundColor: g.leader_id === l.id ? `${COLORS.gold}22` : 'transparent',
+                                    }}
+                                  >
+                                    <Text style={{ fontFamily: FONTS.body, fontSize: 12, color: g.leader_id === l.id ? COLORS.gold : COLORS.white }}>
+                                      {l.name}
+                                    </Text>
+                                  </TouchableOpacity>
+                                ))}
+                              </View>
+                            </ScrollView>
+                          )}
+                        </View>
+                      )}
                     </Card>
                   ))}
                 </View>
@@ -566,25 +641,14 @@ export default function AdminScreen() {
             </View>
 
             {filteredUsers.map(u => (
-              <Card key={u.id} style={{ marginBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                <View style={{
-                  width: 36, height: 36, borderRadius: 18,
-                  backgroundColor: u.role === 'ADM' ? `${COLORS.red}33` : u.role === 'LIDER' ? `${COLORS.gold}33` : 'rgba(255,255,255,0.1)',
-                  alignItems: 'center', justifyContent: 'center',
-                }}>
-                  <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 14, color: u.role === 'ADM' ? COLORS.red : u.role === 'LIDER' ? COLORS.gold : COLORS.white }}>
-                    {u.name.charAt(0).toUpperCase()}
-                  </Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                    <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 13, color: COLORS.white }}>{u.name}</Text>
-                    <Badge label={u.role} variant={u.role === 'ADM' ? 'red' : u.role === 'LIDER' ? 'gold' : 'blue'} />
-                    <Badge label={(u as any).status} variant={(u as any).status === 'active' ? 'green' : (u as any).status === 'rejected' ? 'red' : 'yellow'} />
-                  </View>
-                  <Text style={{ fontFamily: FONTS.body, fontSize: 11, color: COLORS.gray500 }}>{u.email}</Text>
-                </View>
-              </Card>
+              <ExpandableUserCard
+                key={u.id}
+                user={u}
+                groups={groups}
+                currentUserId={profile!.id}
+                onChangeRole={changeUserRole}
+                onAssignGroup={assignUserToGroup}
+              />
             ))}
 
             {filteredUsers.length === 0 && (
@@ -598,5 +662,108 @@ export default function AdminScreen() {
         )}
       </ScrollView>
     </View>
+  );
+}
+
+// ─── ExpandableUserCard ────────────────────────────────────────────────────────
+
+interface ExpandableUserCardProps {
+  user: PendingUser & { role: string; status: string; group_id?: string };
+  groups: Group[];
+  currentUserId: string;
+  onChangeRole: (id: string, name: string, role: string) => void;
+  onAssignGroup: (userId: string, groupId: string) => void;
+}
+
+function ExpandableUserCard({ user: u, groups, currentUserId, onChangeRole, onAssignGroup }: ExpandableUserCardProps) {
+  const [expanded, setExpanded] = useState(false);
+  const isMe = u.id === currentUserId;
+
+  return (
+    <TouchableOpacity onPress={() => setExpanded(!expanded)} activeOpacity={0.8}>
+      <Card style={{ marginBottom: 8 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <View style={{
+            width: 36, height: 36, borderRadius: 18,
+            backgroundColor: u.role === 'ADM' ? `${COLORS.red}33` : u.role === 'LIDER' ? `${COLORS.gold}33` : 'rgba(255,255,255,0.1)',
+            alignItems: 'center', justifyContent: 'center',
+          }}>
+            <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 14, color: u.role === 'ADM' ? COLORS.red : u.role === 'LIDER' ? COLORS.gold : COLORS.white }}>
+              {u.name.charAt(0).toUpperCase()}
+            </Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+              <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 13, color: COLORS.white }}>{u.name}</Text>
+              <Badge label={u.role} variant={u.role === 'ADM' ? 'red' : u.role === 'LIDER' ? 'gold' : 'blue'} />
+              <Badge label={(u as any).status} variant={(u as any).status === 'active' ? 'green' : (u as any).status === 'rejected' ? 'red' : 'yellow'} />
+            </View>
+            <Text style={{ fontFamily: FONTS.body, fontSize: 11, color: COLORS.gray500 }}>{u.email}</Text>
+          </View>
+          <Text style={{ color: COLORS.gray600, fontSize: 12 }}>{expanded ? '▲' : '▼'}</Text>
+        </View>
+
+        {expanded && !isMe && (
+          <View style={{ marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)', gap: 12 }}>
+            {/* Alterar role */}
+            {u.role !== 'ADM' && (
+              <View>
+                <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 10, color: COLORS.gray400, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>
+                  Alterar papel:
+                </Text>
+                <View style={{ flexDirection: 'row', gap: 6 }}>
+                  {(['MEMBRO', 'LIDER'] as const).map(role => (
+                    <TouchableOpacity
+                      key={role}
+                      onPress={() => onChangeRole(u.id, u.name, role)}
+                      style={{
+                        paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1,
+                        borderColor: u.role === role ? COLORS.gold : 'rgba(255,255,255,0.2)',
+                        backgroundColor: u.role === role ? `${COLORS.gold}22` : 'transparent',
+                      }}
+                    >
+                      <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 12, color: u.role === role ? COLORS.gold : COLORS.gray400 }}>
+                        {role}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            )}
+
+            {/* Atribuir a grupo */}
+            {(u.role === 'LIDER' || u.role === 'MEMBRO') && groups.length > 0 && (
+              <View>
+                <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 10, color: COLORS.gray400, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>
+                  Atribuir ao grupo:
+                </Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  <View style={{ flexDirection: 'row', gap: 6 }}>
+                    {groups.filter(g => g.is_active).map(g => {
+                      const isCurrentGroup = (u as any).group_id === g.id;
+                      return (
+                        <TouchableOpacity
+                          key={g.id}
+                          onPress={() => onAssignGroup(u.id, g.id)}
+                          style={{
+                            paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1,
+                            borderColor: isCurrentGroup ? COLORS.gold : 'rgba(255,255,255,0.2)',
+                            backgroundColor: isCurrentGroup ? `${COLORS.gold}22` : 'transparent',
+                          }}
+                        >
+                          <Text style={{ fontFamily: FONTS.body, fontSize: 12, color: isCurrentGroup ? COLORS.gold : COLORS.white }}>
+                            {g.name}{g.cities ? ` · ${(g.cities as any).name}` : ''}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </ScrollView>
+              </View>
+            )}
+          </View>
+        )}
+      </Card>
+    </TouchableOpacity>
   );
 }

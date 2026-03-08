@@ -48,16 +48,22 @@ export default function EventsScreen() {
   });
 
   async function loadEvents() {
-    const q = supabase
+    let q = supabase
       .from('events')
       .select('*')
       .is('cancelled_at', null)
-      .eq('is_template', false)
       .order('event_date', { ascending: false });
+
     if (profile?.role === 'LIDER') {
-      if (profile.group_id) q.eq('group_id', profile.group_id);
-      else q.eq('leader_id', profile.id);
+      // Líder vê apenas as instâncias do seu grupo (não templates)
+      q = q.eq('is_template', false);
+      if ((profile as any).group_id) q = q.eq('group_id', (profile as any).group_id);
+      else q = q.eq('leader_id', profile.id);
+    } else {
+      // ADM vê templates + eventos normais (não vê instâncias geradas)
+      q = q.is('parent_event_id', null);
     }
+
     const { data } = await q;
     setEvents(data ?? []);
     setLoading(false);
@@ -155,7 +161,8 @@ export default function EventsScreen() {
                 {/* Info */}
                 <View style={{ marginBottom: 14 }}>
                   <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginBottom: 4 }}>
-                    {ev.is_official && <Badge label="Oficial" variant="gold" />}
+                    {ev.is_template && <Badge label="🔄 Quinzenal" variant="green" />}
+                    {ev.is_official && !ev.is_template && <Badge label="Oficial" variant="gold" />}
                     {ev.parent_event_id && !ev.leader_confirmed && (
                       <Badge label="⚠️ Confirmar" variant="yellow" />
                     )}
@@ -175,9 +182,14 @@ export default function EventsScreen() {
                       📍 {ev.location}
                     </Text>
                   )}
-                  {isMyEvent && (
+                  {isMyEvent && !ev.is_template && (
                     <Text style={{ fontFamily: FONTS.body, fontSize: 12, color: COLORS.gold, marginTop: 6 }}>
                       👥 {ev.attendees_count} presença{ev.attendees_count !== 1 ? 's' : ''} confirmada{ev.attendees_count !== 1 ? 's' : ''}
+                    </Text>
+                  )}
+                  {ev.is_template && (
+                    <Text style={{ fontFamily: FONTS.body, fontSize: 12, color: '#10B981', marginTop: 6 }}>
+                      🔄 Distribuído para todos os grupos ativos
                     </Text>
                   )}
                 </View>
