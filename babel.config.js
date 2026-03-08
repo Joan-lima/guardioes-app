@@ -1,5 +1,9 @@
 module.exports = function (api) {
-  api.cache(true);
+  // Do NOT call api.cache(true) before api.caller().
+  // api.caller() internally calls cache.using() — if api.cache(true) was already
+  // called (setting _forever = true), cache.using() throws:
+  // "Caching has already been configured with .never or .forever()"
+  // api.caller() handles caching automatically via cache.using().
 
   // nativewind/babel → react-native-css-interop/babel unconditionally adds
   // "react-native-worklets/plugin" which is only needed for native (Reanimated 4).
