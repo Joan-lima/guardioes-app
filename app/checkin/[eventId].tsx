@@ -27,6 +27,10 @@ export default function CheckinScreen() {
   const [doc, setDoc]         = useState('');
   const [phone, setPhone]     = useState('');
   const [prefilled, setPrefilled] = useState(false);
+  const [errorMsg, setErrorMsg]   = useState<string | null>(null);
+
+  // Expo Router pode retornar string | string[] — garantir string
+  const tokenStr = Array.isArray(token) ? token[0] : (token ?? '');
 
   useEffect(() => {
     async function load() {
@@ -67,13 +71,18 @@ export default function CheckinScreen() {
   }
 
   async function handleCheckin() {
+    setErrorMsg(null);
     if (!name.trim() || !email.trim()) {
-      Alert.alert('Atenção', 'Nome e e-mail são obrigatórios');
+      setErrorMsg('Nome e e-mail são obrigatórios.');
+      return;
+    }
+    if (!tokenStr) {
+      setErrorMsg('QR Code inválido. Peça ao organizador um novo QR Code.');
       return;
     }
     setSaving(true);
     const { data, error } = await supabase.rpc('public_checkin', {
-      p_qr_token: token,
+      p_qr_token: tokenStr,
       p_name:     name.trim(),
       p_email:    email.trim().toLowerCase(),
       p_document: doc.replace(/\D/g, '') || undefined,
@@ -82,7 +91,7 @@ export default function CheckinScreen() {
 
     setSaving(false);
     if (error || !data?.success) {
-      Alert.alert('Erro', data?.error ?? error?.message ?? 'Tente novamente');
+      setErrorMsg(data?.error ?? error?.message ?? 'Erro ao confirmar presença. Tente novamente.');
       return;
     }
     setSuccess(true);
@@ -210,6 +219,18 @@ export default function CheckinScreen() {
             <Text style={labelStyle}>Telefone</Text>
             <TextInput value={phone} onChangeText={setPhone} placeholder="(00) 00000-0000" placeholderTextColor={COLORS.gray600} keyboardType="phone-pad" style={inputStyle} />
           </View>
+
+          {errorMsg && (
+            <View style={{
+              backgroundColor: 'rgba(239,68,68,0.12)',
+              borderWidth: 1, borderColor: 'rgba(239,68,68,0.4)',
+              borderRadius: 10, padding: 14,
+            }}>
+              <Text style={{ fontFamily: FONTS.body, fontSize: 13, color: '#EF4444', textAlign: 'center' }}>
+                ⚠️ {errorMsg}
+              </Text>
+            </View>
+          )}
 
           <GoldButton onPress={handleCheckin} loading={saving} style={{ marginTop: 8 }}>
             Confirmar Presença
