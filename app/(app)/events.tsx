@@ -13,16 +13,20 @@ import { Badge } from '../../components/ui/Badge';
 import { COLORS, FONTS } from '../../constants/theme';
 
 interface Event {
-  id:              string;
-  title:           string;
-  description:     string | null;
-  event_date:      string;
-  event_time:      string | null;
-  location:        string | null;
-  is_official:     boolean;
-  attendees_count: number;
-  leader_id:       string;
-  cancelled_at:    string | null;
+  id:               string;
+  title:            string;
+  description:      string | null;
+  event_date:       string;
+  event_time:       string | null;
+  location:         string | null;
+  is_official:      boolean;
+  attendees_count:  number;
+  leader_id:        string;
+  cancelled_at:     string | null;
+  group_id:         string | null;
+  is_template:      boolean;
+  parent_event_id:  string | null;
+  leader_confirmed: boolean;
 }
 
 const REGISTER_BASE = 'https://sistema.guardioesdaconsciencia.com.br/register';
@@ -40,12 +44,20 @@ export default function EventsScreen() {
 
   const [form, setForm] = useState({
     title: '', description: '', event_date: '', event_time: '',
-    location: '', is_official: false,
+    location: '', is_official: false, is_quinzenal: false,
   });
 
   async function loadEvents() {
-    const q = supabase.from('events').select('*').is('cancelled_at', null).order('event_date', { ascending: false });
-    if (profile?.role === 'LIDER') q.eq('leader_id', profile.id);
+    const q = supabase
+      .from('events')
+      .select('*')
+      .is('cancelled_at', null)
+      .eq('is_template', false)
+      .order('event_date', { ascending: false });
+    if (profile?.role === 'LIDER') {
+      if (profile.group_id) q.eq('group_id', profile.group_id);
+      else q.eq('leader_id', profile.id);
+    }
     const { data } = await q;
     setEvents(data ?? []);
     setLoading(false);
@@ -61,20 +73,32 @@ export default function EventsScreen() {
       return;
     }
     setSaving(true);
+    const isQuinzenal = profile?.role === 'ADM' && form.is_quinzenal;
     const { error } = await supabase.from('events').insert({
       title:       form.title,
       description: form.description || null,
       event_date:  form.event_date,
       event_time:  form.event_time || null,
       location:    form.location || null,
-      is_official: profile?.role === 'ADM' ? form.is_official : false,
+      is_official: profile?.role === 'ADM' ? (form.is_official || isQuinzenal) : false,
+      is_template: isQuinzenal,
       leader_id:   profile!.id,
-      city_id:     profile?.city_id ?? null,
+      city_id:     (profile as any)?.city_id ?? null,
+      group_id:    isQuinzenal ? null : ((profile as any)?.group_id ?? null),
     });
     setSaving(false);
     if (error) { Alert.alert('Erro', error.message); return; }
     setShowModal(false);
-    setForm({ title: '', description: '', event_date: '', event_time: '', location: '', is_official: false });
+    setForm({ title: '', description: '', event_date: '', event_time: '', location: '', is_official: false, is_quinzenal: false });
+    if (isQuinzenal) Alert.alert('✅ Evento Quinzenal criado!', 'Os líderes já podem ver e confirmar o encontro nos seus grupos.');
+    loadEvents();
+  }
+
+  async function confirmEvent(eventId: string) {
+    await supabase.from('events').update({
+      leader_confirmed: true,
+      confirmed_at: new Date().toISOString(),
+    }).eq('id', eventId);
     loadEvents();
   }
 
@@ -130,8 +154,16 @@ export default function EventsScreen() {
               <Card key={ev.id} style={{ marginBottom: 12 }}>
                 {/* Info */}
                 <View style={{ marginBottom: 14 }}>
-                  {ev.is_official && <Badge label="Oficial" variant="gold" />}
-                  <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 15, color: COLORS.white, marginTop: ev.is_official ? 8 : 0 }}>
+                  <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginBottom: 4 }}>
+                    {ev.is_official && <Badge label="Oficial" variant="gold" />}
+                    {ev.parent_event_id && !ev.leader_confirmed && (
+                      <Badge label="⚠️ Confirmar" variant="yellow" />
+                    )}
+                    {ev.parent_event_id && ev.leader_confirmed && (
+                      <Badge label="✅ Confirmado" variant="green" />
+                    )}
+                  </View>
+                  <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 15, color: COLORS.white }}>
                     {ev.title}
                   </Text>
                   <Text style={{ fontFamily: FONTS.body, fontSize: 12, color: COLORS.gray500, marginTop: 4 }}>
@@ -149,6 +181,18 @@ export default function EventsScreen() {
                     </Text>
                   )}
                 </View>
+
+                {/* Confirmar realização (evento quinzenal pendente) */}
+                {ev.parent_event_id && !ev.leader_confirmed && isMyEvent && (
+                  <TouchableOpacity
+                    onPress={() => confirmEvent(ev.id)}
+                    style={{ backgroundColor: '#10B981', borderRadius: 8, paddingVertical: 10, alignItems: 'center', marginBottom: 8 }}
+                  >
+                    <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 12, color: COLORS.white }}>
+                      ✅ Confirmar Realização do Encontro
+                    </Text>
+                  </TouchableOpacity>
+                )}
 
                 {/* Actions */}
                 <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -225,15 +269,26 @@ export default function EventsScreen() {
                 <TextInput value={form.description} onChangeText={t => setForm(f => ({ ...f, description: t }))} placeholder="Detalhes do evento..." placeholderTextColor={COLORS.gray600} multiline numberOfLines={3} style={[inputStyle, { textAlignVertical: 'top', minHeight: 80 }]} />
               </View>
               {profile?.role === 'ADM' && (
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 10 }}>
-                  <View>
-                    <Text style={{ fontFamily: FONTS.bodyBold, color: COLORS.white, fontSize: 14 }}>Evento Oficial</Text>
-                    <Text style={{ fontFamily: FONTS.body, color: COLORS.gray500, fontSize: 12 }}>Exibido em destaque para todos</Text>
+                <>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 10 }}>
+                    <View>
+                      <Text style={{ fontFamily: FONTS.bodyBold, color: COLORS.white, fontSize: 14 }}>Evento Oficial</Text>
+                      <Text style={{ fontFamily: FONTS.body, color: COLORS.gray500, fontSize: 12 }}>Exibido em destaque</Text>
+                    </View>
+                    <Switch value={form.is_official} onValueChange={v => setForm(f => ({ ...f, is_official: v, is_quinzenal: false }))} trackColor={{ true: COLORS.gold, false: 'rgba(255,255,255,0.1)' }} thumbColor={COLORS.white} />
                   </View>
-                  <Switch value={form.is_official} onValueChange={v => setForm(f => ({ ...f, is_official: v }))} trackColor={{ true: COLORS.gold, false: 'rgba(255,255,255,0.1)' }} thumbColor={COLORS.white} />
-                </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14, backgroundColor: form.is_quinzenal ? 'rgba(16,185,129,0.1)' : 'rgba(255,255,255,0.05)', borderRadius: 10, borderWidth: form.is_quinzenal ? 1 : 0, borderColor: '#10B981' }}>
+                    <View style={{ flex: 1, marginRight: 12 }}>
+                      <Text style={{ fontFamily: FONTS.bodyBold, color: COLORS.white, fontSize: 14 }}>🔄 Encontro Quinzenal</Text>
+                      <Text style={{ fontFamily: FONTS.body, color: COLORS.gray500, fontSize: 12 }}>Gera automaticamente para todos os grupos ativos</Text>
+                    </View>
+                    <Switch value={form.is_quinzenal} onValueChange={v => setForm(f => ({ ...f, is_quinzenal: v, is_official: false }))} trackColor={{ true: '#10B981', false: 'rgba(255,255,255,0.1)' }} thumbColor={COLORS.white} />
+                  </View>
+                </>
               )}
-              <GoldButton onPress={createEvent} loading={saving} style={{ marginTop: 8 }}>Criar Evento</GoldButton>
+              <GoldButton onPress={createEvent} loading={saving} style={{ marginTop: 8 }}>
+                {form.is_quinzenal ? '🔄 Criar Encontro Quinzenal' : 'Criar Evento'}
+              </GoldButton>
             </View>
           </ScrollView>
         </View>

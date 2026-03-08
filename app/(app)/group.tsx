@@ -18,47 +18,54 @@ interface Member {
   created_at: string;
 }
 
-interface CheckInStat {
-  total: number;
-  thisMonth: number;
+interface GroupInfo {
+  name: string;
+  cities: { name: string; state: string } | null;
 }
 
 export default function GroupScreen() {
   const insets = useSafeAreaInsets();
   const { profile } = useAuthStore();
+  const [groupInfo, setGroupInfo]   = useState<GroupInfo | null>(null);
   const [members, setMembers]       = useState<Member[]>([]);
   const [filtered, setFiltered]     = useState<Member[]>([]);
   const [search, setSearch]         = useState('');
   const [refreshing, setRefreshing] = useState(false);
-  const [checkinStat, setCheckinStat] = useState<CheckInStat>({ total: 0, thisMonth: 0 });
+  const [totalAttendances, setTotalAttendances] = useState(0);
+  const [eventsCount, setEventsCount]           = useState(0);
 
   async function load() {
-    if (!profile?.city_id) return;
+    if (!profile?.group_id) return;
 
-    const [{ data: membersData }, { data: checkins }, { data: checkinMonth }] = await Promise.all([
+    const [{ data: grp }, { data: membersData }, { data: eventsData }] = await Promise.all([
+      supabase
+        .from('groups')
+        .select('name, cities(name, state)')
+        .eq('id', profile.group_id)
+        .single(),
       supabase
         .from('profiles')
         .select('id, name, email, role, status, total_pe, created_at')
-        .eq('city_id', profile.city_id)
+        .eq('group_id', profile.group_id)
         .eq('status', 'active')
         .order('total_pe', { ascending: false }),
       supabase
-        .from('check_ins')
-        .select('id', { count: 'exact', head: true })
-        .not('guest_name', 'is', null),
-      supabase
-        .from('check_ins')
-        .select('id', { count: 'exact', head: true })
-        .gte('checked_in_at', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()),
+        .from('events')
+        .select('id, attendees_count, event_date')
+        .eq('group_id', profile.group_id)
+        .eq('is_template', false)
+        .is('cancelled_at', null),
     ]);
+
+    setGroupInfo(grp as any);
 
     const list = membersData ?? [];
     setMembers(list);
     setFiltered(list);
-    setCheckinStat({
-      total: (checkins as any)?.count ?? 0,
-      thisMonth: (checkinMonth as any)?.count ?? 0,
-    });
+
+    const events = eventsData ?? [];
+    setEventsCount(events.length);
+    setTotalAttendances(events.reduce((sum, e) => sum + (e.attendees_count || 0), 0));
   }
 
   useEffect(() => { if (profile) load(); }, [profile]);
@@ -66,80 +73,97 @@ export default function GroupScreen() {
   useEffect(() => {
     if (!search.trim()) { setFiltered(members); return; }
     const q = search.toLowerCase();
-    setFiltered(members.filter(m => m.name.toLowerCase().includes(q) || m.email.toLowerCase().includes(q)));
+    setFiltered(members.filter(m =>
+      m.name.toLowerCase().includes(q) || m.email.toLowerCase().includes(q)
+    ));
   }, [search, members]);
 
   async function promoteToLeader(memberId: string, memberName: string) {
-    Alert.alert(
-      'Promover a Líder',
-      `Deseja promover ${memberName} a Líder da cidade?`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Promover',
-          onPress: async () => {
-            const { error } = await supabase
-              .from('profiles')
-              .update({ role: 'LIDER' })
-              .eq('id', memberId);
-            if (error) { Alert.alert('Erro', error.message); return; }
-            Alert.alert('✅', `${memberName} agora é Líder!`);
-            load();
-          },
+    Alert.alert('Promover a Líder', `Deseja promover ${memberName} a Líder?`, [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Promover',
+        onPress: async () => {
+          const { error } = await supabase
+            .from('profiles').update({ role: 'LIDER' }).eq('id', memberId);
+          if (error) { Alert.alert('Erro', error.message); return; }
+          Alert.alert('✅', `${memberName} agora é Líder!`);
+          load();
         },
-      ]
+      },
+    ]);
+  }
+
+  async function removeFromGroup(memberId: string, memberName: string) {
+    Alert.alert('Remover do Grupo', `Deseja remover ${memberName} deste grupo?`, [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Remover',
+        style: 'destructive',
+        onPress: async () => {
+          const { error } = await supabase
+            .from('profiles').update({ group_id: null, city_id: null }).eq('id', memberId);
+          if (error) { Alert.alert('Erro', error.message); return; }
+          load();
+        },
+      },
+    ]);
+  }
+
+  if (!profile?.group_id) {
+    return (
+      <View style={{ flex: 1, backgroundColor: COLORS.dark, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+        <Text style={{ fontSize: 48, marginBottom: 16 }}>🏘️</Text>
+        <Text style={{ fontFamily: FONTS.title, fontSize: 18, color: COLORS.white, textAlign: 'center', marginBottom: 8 }}>
+          Sem grupo atribuído
+        </Text>
+        <Text style={{ fontFamily: FONTS.body, fontSize: 14, color: COLORS.gray400, textAlign: 'center' }}>
+          Aguarde o administrador atribuir você a um grupo.
+        </Text>
+      </View>
     );
   }
 
-  async function removeFromCity(memberId: string, memberName: string) {
-    Alert.alert(
-      'Remover da Cidade',
-      `Deseja remover ${memberName} desta cidade?`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Remover',
-          style: 'destructive',
-          onPress: async () => {
-            const { error } = await supabase
-              .from('profiles')
-              .update({ city_id: null })
-              .eq('id', memberId);
-            if (error) { Alert.alert('Erro', error.message); return; }
-            load();
-          },
-        },
-      ]
-    );
-  }
-
-  const leaders = filtered.filter(m => m.role === 'LIDER');
+  const leaders       = filtered.filter(m => m.role === 'LIDER');
   const regularMembers = filtered.filter(m => m.role === 'MEMBRO');
-
-  const roleVariant = (role: string) => role === 'LIDER' ? 'gold' : role === 'ADM' ? 'red' : 'blue';
+  const roleVariant   = (role: string) => role === 'LIDER' ? 'gold' : role === 'ADM' ? 'red' : 'blue';
 
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: COLORS.dark }}
       contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 32 }}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} tintColor={COLORS.gold} />}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }}
+          tintColor={COLORS.gold}
+        />
+      }
     >
-      <Text style={{ fontFamily: FONTS.title, fontSize: 24, color: COLORS.white, marginBottom: 20 }}>
-        Meu Grupo
-      </Text>
+      {/* Header do grupo */}
+      <View style={{ marginBottom: 20 }}>
+        <Text style={{ fontFamily: FONTS.title, fontSize: 24, color: COLORS.white }}>
+          {groupInfo?.name ?? 'Meu Grupo'}
+        </Text>
+        {groupInfo?.cities && (
+          <Text style={{ fontFamily: FONTS.body, fontSize: 13, color: COLORS.gold, marginTop: 4 }}>
+            📍 {(groupInfo.cities as any).name} — {(groupInfo.cities as any).state}
+          </Text>
+        )}
+      </View>
 
       {/* Stats */}
       <View style={{ flexDirection: 'row', gap: 12, marginBottom: 24 }}>
         <StatCard
           title="Membros Ativos"
           value={String(members.length)}
-          sub="na sua cidade"
+          sub="no grupo"
           icon={<Text>👥</Text>}
         />
         <StatCard
-          title="Check-ins Mês"
-          value={String(checkinStat.thisMonth)}
-          sub={`${checkinStat.total} total`}
+          title="Presenças"
+          value={String(totalAttendances)}
+          sub={`${eventsCount} encontros`}
           icon={<Text>✅</Text>}
         />
       </View>
@@ -161,7 +185,6 @@ export default function GroupScreen() {
         />
       </View>
 
-      {/* Leaders section */}
       {leaders.length > 0 && (
         <>
           <Text style={{ fontFamily: FONTS.title, fontSize: 14, color: COLORS.gold, marginBottom: 12, letterSpacing: 1, textTransform: 'uppercase' }}>
@@ -174,17 +197,21 @@ export default function GroupScreen() {
               isMe={m.id === profile?.id}
               canManage={profile?.role === 'ADM'}
               onPromote={promoteToLeader}
-              onRemove={removeFromCity}
+              onRemove={removeFromGroup}
               roleVariant={roleVariant}
             />
           ))}
         </>
       )}
 
-      {/* Members section */}
-      <Text style={{ fontFamily: FONTS.title, fontSize: 14, color: COLORS.gray400, marginBottom: 12, marginTop: leaders.length > 0 ? 16 : 0, letterSpacing: 1, textTransform: 'uppercase' }}>
+      <Text style={{
+        fontFamily: FONTS.title, fontSize: 14, color: COLORS.gray400,
+        marginBottom: 12, marginTop: leaders.length > 0 ? 16 : 0,
+        letterSpacing: 1, textTransform: 'uppercase',
+      }}>
         Membros ({regularMembers.length})
       </Text>
+
       {regularMembers.length === 0 ? (
         <View style={{ alignItems: 'center', paddingVertical: 40 }}>
           <Text style={{ fontSize: 40, marginBottom: 12 }}>👥</Text>
@@ -200,7 +227,7 @@ export default function GroupScreen() {
             isMe={m.id === profile?.id}
             canManage={profile?.role === 'ADM' || profile?.role === 'LIDER'}
             onPromote={promoteToLeader}
-            onRemove={removeFromCity}
+            onRemove={removeFromGroup}
             roleVariant={roleVariant}
           />
         ))
@@ -226,7 +253,6 @@ function MemberCard({ member: m, isMe, canManage, onPromote, onRemove, roleVaria
     <TouchableOpacity onPress={() => setExpanded(!expanded)} activeOpacity={0.8}>
       <Card style={{ marginBottom: 8, borderLeftWidth: isMe ? 3 : 0, borderLeftColor: COLORS.gold }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          {/* Avatar */}
           <View style={{
             width: 40, height: 40, borderRadius: 20,
             backgroundColor: isMe ? COLORS.gold : 'rgba(255,255,255,0.1)',
@@ -237,7 +263,6 @@ function MemberCard({ member: m, isMe, canManage, onPromote, onRemove, roleVaria
             </Text>
           </View>
 
-          {/* Info */}
           <View style={{ flex: 1 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 14, color: isMe ? COLORS.gold : COLORS.white }}>
