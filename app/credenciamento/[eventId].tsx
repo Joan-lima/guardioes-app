@@ -1,15 +1,15 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  ActivityIndicator, Modal, Platform,
+  ActivityIndicator, Modal,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { CameraView, useCameraPermissions } from 'expo-camera';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../stores/authStore';
 import { GoldButton } from '../../components/ui/GoldButton';
 import { COLORS, FONTS } from '../../constants/theme';
+import QRScanner from '../../components/QRScanner';
 
 interface EventInfo { title: string; event_date: string; attendees_count: number; }
 interface Reg {
@@ -35,7 +35,6 @@ export default function CredenciamentoScreen() {
   const [selected, setSelected] = useState<Reg | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [scanned,  setScanned]  = useState(false);
-  const [permission, requestPermission] = useCameraPermissions();
 
   useEffect(() => {
     if (!authLoading && profile) load();
@@ -210,48 +209,20 @@ export default function CredenciamentoScreen() {
           </ScrollView>
         </>
       ) : (
-        /* Scanner */
+        /* Scanner — funciona em web (Chrome/Safari 17+) e nativo */
         <View style={{ flex: 1 }}>
-          {Platform.OS === 'web' ? (
-            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-              <Text style={{ fontSize: 48, marginBottom: 16 }}>📷</Text>
-              <Text style={{ fontFamily: FONTS.title, fontSize: 18, color: COLORS.white, textAlign: 'center', marginBottom: 8 }}>
-                Scanner de QR Code
-              </Text>
-              <Text style={{ fontFamily: FONTS.body, fontSize: 14, color: COLORS.gray400, textAlign: 'center', marginBottom: 24 }}>
-                No celular, use a aba "Lista" para confirmar manualmente, ou use a câmera nativa para escanear o QR do participante — ele será aberto neste navegador.
-              </Text>
-            </View>
-          ) : !permission?.granted ? (
-            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-              <Text style={{ fontFamily: FONTS.body, fontSize: 14, color: COLORS.gray400, textAlign: 'center', marginBottom: 16 }}>
-                Precisamos da câmera para escanear QR Codes
-              </Text>
-              <GoldButton onPress={requestPermission}>Permitir Câmera</GoldButton>
-            </View>
-          ) : (
-            <View style={{ flex: 1 }}>
-              <CameraView
-                style={{ flex: 1 }}
-                facing="back"
-                barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
-                onBarcodeScanned={scanned ? undefined : handleBarcodeScan}
-              />
-              <View style={{ position: 'absolute', bottom: 32, left: 0, right: 0, alignItems: 'center' }}>
-                <View style={{ backgroundColor: 'rgba(0,0,0,0.7)', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12 }}>
-                  <Text style={{ fontFamily: FONTS.body, fontSize: 14, color: COLORS.white, textAlign: 'center' }}>
-                    Aponte para o QR Code do participante
-                  </Text>
-                </View>
-                {scanned && (
-                  <TouchableOpacity
-                    onPress={() => setScanned(false)}
-                    style={{ marginTop: 12, backgroundColor: COLORS.gold, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8 }}
-                  >
-                    <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 13, color: COLORS.dark }}>Escanear Novamente</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
+          <QRScanner
+            onScan={(data) => { if (!scanned) handleBarcodeScan({ data }); }}
+            active={!scanned}
+          />
+          {scanned && (
+            <View style={{ position: 'absolute', bottom: 32, left: 0, right: 0, alignItems: 'center' }}>
+              <TouchableOpacity
+                onPress={() => setScanned(false)}
+                style={{ backgroundColor: COLORS.gold, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 10 }}
+              >
+                <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 14, color: COLORS.dark }}>Escanear Próximo</Text>
+              </TouchableOpacity>
             </View>
           )}
         </View>
