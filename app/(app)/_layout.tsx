@@ -23,6 +23,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/(app)/community',  label: 'Comunidade',   icon: '💬', roles: ['ADM', 'LIDER', 'MEMBRO'] },
   { href: '/(app)/sales',      label: 'Vendas',       icon: '💰', roles: ['ADM', 'LIDER'] },
   { href: '/(app)/missions',   label: 'Missões',      icon: '🎯', roles: ['ADM', 'LIDER'] },
+  { href: '/(app)/profile',    label: 'Meu Perfil',   icon: '👤', roles: ['ADM', 'LIDER', 'MEMBRO'] },
   { href: '/(app)/admin',      label: 'Admin',        icon: '⚙️', roles: ['ADM'] },
 ];
 
@@ -69,6 +70,7 @@ export default function AppLayout() {
             </Text>
           </View>
           <TouchableOpacity
+            onPress={() => router.push('/(app)/profile' as any)}
             style={{
               width: 34, height: 34, borderRadius: 17,
               backgroundColor: `${COLORS.gold}33`,

@@ -13,10 +13,10 @@ interface RankEntry {
   score: number; rank: number; isMe?: boolean;
 }
 
-const VIEW_MAP: Record<RankType, string> = {
-  points: 'v_ranking_points',
-  sales:  'v_ranking_sales',
-  growth: 'v_ranking_growth',
+const RPC_MAP: Record<RankType, string> = {
+  points: 'get_ranking_points',
+  sales:  'get_ranking_sales',
+  growth: 'get_ranking_growth',
 };
 
 const SCORE_MAP: Record<RankType, (r: any) => number> = {
@@ -39,7 +39,7 @@ export default function RankingScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   async function load() {
-    const { data: rows } = await supabase.from(VIEW_MAP[type]).select('*').order('rank').limit(50);
+    const { data: rows } = await supabase.rpc(RPC_MAP[type]);
     if (!rows) return;
     const mapped: RankEntry[] = rows.map(r => ({
       id:        r.id,
